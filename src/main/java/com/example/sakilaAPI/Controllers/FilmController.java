@@ -3,17 +3,17 @@ package com.example.sakilaAPI.Controllers;
 import com.example.sakilaAPI.Entities.Film;
 import com.example.sakilaAPI.Entities.Language;
 import com.example.sakilaAPI.REPOSITORIES.FilmRepository;
-import com.example.sakilaAPI.REPOSITORIES.LanguageRepository;
 import com.example.sakilaAPI.dto.input.FilmInput;
-import com.example.sakilaAPI.dto.input.ValidationGroup;
 import com.example.sakilaAPI.dto.output.FilmOutput;
-import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.Link;
+import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -21,19 +21,9 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/films")
 public class FilmController {
+
     @Autowired
     private FilmRepository filmRepository;
-
-    @Autowired
-    private LanguageRepository languageRepository;
-
-    @GetMapping
-    public List<FilmOutput> readAll() {
-        final var films = filmRepository.findAll();
-        return films.stream()
-                .map(FilmOutput::from)
-                .collect(Collectors.toList());
-    }
 
     @GetMapping("/{id}")
     public ResponseEntity<FilmOutput> getFilmById(@PathVariable Short id) {
@@ -41,70 +31,86 @@ public class FilmController {
         if (filmOptional.isPresent()) {
             Film film = filmOptional.get();
             FilmOutput filmOutput = FilmOutput.from(film);
-            return ResponseEntity.ok(filmOutput);
+
+            // HATEOAS stuff - links
+            EntityModel<FilmOutput> entityModel = EntityModel.of(filmOutput);
+            Link selfLink = WebMvcLinkBuilder.linkTo(FilmController.class).slash(id).withSelfRel();
+            entityModel.add(selfLink);
+
+            return ResponseEntity.ok(entityModel.getContent());
         } else {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @GetMapping
+    public ResponseEntity<CollectionModel<EntityModel<FilmOutput>>> getAllFilms() {
+        List<Film> films = filmRepository.findAll();
+        List<EntityModel<FilmOutput>> filmOutputs = films.stream()
+                .map(film -> {
+                    EntityModel<FilmOutput> entityModel = EntityModel.of(FilmOutput.from(film));
+                    Link selfLink = WebMvcLinkBuilder.linkTo(FilmController.class).slash(film.getId()).withSelfRel();
+                    entityModel.add(selfLink);
+                    return entityModel;
+                })
+                .collect(Collectors.toList());
+
+        CollectionModel<EntityModel<FilmOutput>> collectionModel = CollectionModel.of(filmOutputs);
+        return new ResponseEntity<>(collectionModel, HttpStatus.OK);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public FilmOutput create(@Validated(ValidationGroup.Create.class) @RequestBody FilmInput data) {
-        final var film = new Film();
-        film.setTitle(data.getTitle());
-        film.setDuration(data.getDuration());
-        film.setRate(data.getRate());
-        film.setCost(data.getCost());
-        film.setDescription(data.getDescription());
+    public FilmOutput createFilm(@Valid @RequestBody FilmInput filmInput) {
+        Film film = new Film();
+        film.setTitle(filmInput.getTitle());
+        film.setDuration(filmInput.getDuration());
+        film.setRate(filmInput.getRate());
+        film.setCost(filmInput.getCost());
+        film.setDescription(filmInput.getDescription());
+        film.setLanguage(filmInput.getLanguageId());
 
-        Optional<Language> languageOptional = languageRepository.findById(data.getLanguageId());
-        if (languageOptional.isEmpty()) {
-            throw new RuntimeException("Language with ID " + data.getLanguageId() + " not found.");
-        }
-        Language language = languageOptional.get();
-        film.setLanguage(language);
 
         final var saved = filmRepository.save(film);
         return FilmOutput.from(saved);
     }
 
-    @PatchMapping("/{id}")
-    public FilmOutput partialUpdateFilm(@PathVariable Short id,
-                                        @Validated(ValidationGroup.Update.class) @RequestBody FilmInput data) {
-        return filmRepository.findById(id)
-                .map(film -> {
-                    if (data.getTitle() != null) {
-                        film.setTitle(data.getTitle());
-                    }
-                    if (data.getLanguageId() != null) {
-                        Optional<Language> languageOptional = languageRepository.findById(data.getLanguageId());
-                        if (languageOptional.isEmpty()) {
-                            throw new EntityNotFoundException("Language with ID " + data.getLanguageId() + " not found.");
-                        }
-                        Language language = languageOptional.get();
-                        film.setLanguage(language);
-                    }
-                    if (data.getDuration() != null) {
-                        film.setDuration(data.getDuration());
-                    }
-                    if (data.getRate() != null) {
-                        film.setRate(data.getRate());
-                    }
-                    if (data.getCost() != null) {
-                        film.setCost(data.getCost());
-                    }
-                    if (data.getDescription() != null) {
-                        film.setDescription(data.getDescription());
-                    }
-                    final var saved = filmRepository.save(film);
-                    return FilmOutput.from(saved);
-                })
-                .orElseThrow(() -> new EntityNotFoundException("Film not found with id " + id));
-    }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteFilm(@PathVariable Short id) {
+    public void deleteFilmById(@PathVariable Short id) {
         filmRepository.deleteById(id);
     }
 
+    @PatchMapping("/{id}")
+    public ResponseEntity<FilmOutput> partialUpdateFilmById(@PathVariable Short id, @RequestBody FilmInput filmInput) {
+        Optional<Film> optionalFilm = filmRepository.findById(id);
+        if (optionalFilm.isPresent()) {
+            Film film = optionalFilm.get();
+            if (filmInput.getTitle() != null) {
+                film.setTitle(filmInput.getTitle());
+            }
+            if (filmInput.getDuration() != null) {
+                film.setDuration(filmInput.getDuration());
+            }
+            if (filmInput.getRate() != null) {
+                film.setRate(filmInput.getRate());
+            }
+            if (filmInput.getCost() != null) {
+                film.setCost(filmInput.getCost());
+            }
+            if (filmInput.getDescription() != null) {
+                film.setDescription(filmInput.getDescription());
+            }
+            if (filmInput.getLanguageId() != null) {
+                film.setLanguage(filmInput.getLanguageId());
+            }
+
+            final var updatedFilm = filmRepository.save(film);
+            FilmOutput filmOutput = FilmOutput.from(updatedFilm);
+            return ResponseEntity.ok(filmOutput);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
 }

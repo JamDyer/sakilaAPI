@@ -35,10 +35,8 @@ public class Film {
     @Column( name = "description")
     private String description;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "language_id")
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private Language language;
+    @Column(name = "language_id")
+    private Long language;
 
     @ManyToMany
     @JoinTable(

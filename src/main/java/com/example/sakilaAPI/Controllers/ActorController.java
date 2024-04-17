@@ -140,7 +140,7 @@ public class ActorController {
                 .collect(Collectors.toList());
 
         CollectionModel<EntityModel<ActorOutput>> collectionModel = CollectionModel.of(actorOutputs);
-        
+
         // Add a next page link if not the last page
         if ((long) pageNo * pageSize < actorRepository.count()) {
             Link nextLink = WebMvcLinkBuilder.linkTo(ActorController.class).slash("page/" + (pageNo + 1)).withRel("next");

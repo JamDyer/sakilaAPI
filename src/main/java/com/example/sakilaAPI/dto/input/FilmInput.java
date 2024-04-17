@@ -17,9 +17,6 @@ public class FilmInput {
     private String title;
 
     @NotNull(groups = {ValidationGroup.Create.class})
-    private Short languageId;
-
-    @NotNull(groups = {ValidationGroup.Create.class})
     private Short duration;
 
     @NotNull(groups = {ValidationGroup.Create.class})
@@ -33,5 +30,8 @@ public class FilmInput {
     @NotNull(groups = {ValidationGroup.Create.class})
     @Size(min = 1, max = 500)
     private String description;
+
+    @NotNull(groups = {ValidationGroup.Create.class})
+    private Long languageId;
 
 }
