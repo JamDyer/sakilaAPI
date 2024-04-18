@@ -3,6 +3,7 @@ package com.example.sakilaAPI.Controllers;
 import com.example.sakilaAPI.Entities.Film;
 import com.example.sakilaAPI.Entities.Language;
 import com.example.sakilaAPI.REPOSITORIES.FilmRepository;
+import com.example.sakilaAPI.REPOSITORIES.LanguageRepository;
 import com.example.sakilaAPI.dto.input.FilmInput;
 import com.example.sakilaAPI.dto.output.FilmOutput;
 import jakarta.validation.Valid;
@@ -25,12 +26,21 @@ public class FilmController {
     @Autowired
     private FilmRepository filmRepository;
 
+    @Autowired
+    private LanguageRepository languageRepository;
+
     @GetMapping("/{id}")
     public ResponseEntity<FilmOutput> getFilmById(@PathVariable Short id) {
         Optional<Film> filmOptional = filmRepository.findById(id);
         if (filmOptional.isPresent()) {
             Film film = filmOptional.get();
             FilmOutput filmOutput = FilmOutput.from(film);
+
+            // Fetch language information
+            Language language = film.getLanguage();
+            filmOutput.setLanguageId(language.getId());
+            filmOutput.setLanguageName(language.getName());
+
 
             // HATEOAS stuff - links
             EntityModel<FilmOutput> entityModel = EntityModel.of(filmOutput);
@@ -48,6 +58,13 @@ public class FilmController {
         List<Film> films = filmRepository.findAll();
         List<EntityModel<FilmOutput>> filmOutputs = films.stream()
                 .map(film -> {
+                    FilmOutput filmOutput = FilmOutput.from(film);
+
+                    // Fetch language information
+                    Language language = film.getLanguage();
+                    filmOutput.setLanguageId(language.getId());
+                    filmOutput.setLanguageName(language.getName());
+
                     EntityModel<FilmOutput> entityModel = EntityModel.of(FilmOutput.from(film));
                     Link selfLink = WebMvcLinkBuilder.linkTo(FilmController.class).slash(film.getId()).withSelfRel();
                     entityModel.add(selfLink);
@@ -68,7 +85,16 @@ public class FilmController {
         film.setRate(filmInput.getRate());
         film.setCost(filmInput.getCost());
         film.setDescription(filmInput.getDescription());
-        film.setLanguage(filmInput.getLanguageId());
+
+        // Fetch the Language entity from the LanguageRepository
+        Optional<Language> languageOptional = languageRepository.findById(filmInput.getLanguageId());
+        if (languageOptional.isPresent()) {
+            Language language = languageOptional.get();
+            film.setLanguage(language);
+        } else {
+            // Handle the case where the provided language ID does not exist
+            throw new IllegalArgumentException("Language not found for ID: " + filmInput.getLanguageId());
+        }
 
 
         final var saved = filmRepository.save(film);
@@ -102,8 +128,13 @@ public class FilmController {
             if (filmInput.getDescription() != null) {
                 film.setDescription(filmInput.getDescription());
             }
-            if (filmInput.getLanguageId() != null) {
-                film.setLanguage(filmInput.getLanguageId());
+            Optional<Language> languageOptional = languageRepository.findById(filmInput.getLanguageId());
+            if (languageOptional.isPresent()) {
+                Language language = languageOptional.get();
+                film.setLanguage(language);
+            } else {
+                // Handle the case where the provided language ID does not exist
+                throw new IllegalArgumentException("Language not found for ID: " + filmInput.getLanguageId());
             }
 
             final var updatedFilm = filmRepository.save(film);

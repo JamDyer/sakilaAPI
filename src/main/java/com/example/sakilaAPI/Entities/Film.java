@@ -35,8 +35,9 @@ public class Film {
     @Column( name = "description")
     private String description;
 
-    @Column(name = "language_id")
-    private Long language;
+    @ManyToOne
+    @JoinColumn(name = "language_id")
+    private Language language;
 
     @ManyToMany
     @JoinTable(

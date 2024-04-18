@@ -30,6 +30,6 @@ public class FilmInput {
     private String description;
 
     @NotNull(groups = {ValidationGroup.Create.class}, message = "Language ID cannot be null")
-    private Long languageId;
+    private Short languageId;
 
 }
